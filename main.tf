@@ -103,5 +103,5 @@ resource "google_sql_database_instance" "app_database" {
 resource "google_sql_user" "db_user" {
   name     = "admin"
   instance = google_sql_database_instance.app_database.name
-  password = "R@nd0mP@ss12345"
+  password = "R@nd0mP@ss123456"
 }
