@@ -30,7 +30,7 @@ resource "google_compute_instance" "web_server" {
 }
 
 resource "google_compute_firewall" "web_sg" {
-  name    = "web-sg"
+  name    = "web-sg1"
   network = "default"
 
   allow {
